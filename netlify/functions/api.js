@@ -328,29 +328,38 @@ document.getElementById('relGo').onclick=function(){
   const arr = (v, n) => Array.isArray(v) ? v.slice(-n) : [];
 
   if (path.endsWith('/wall')) {
+    const rk = k => 'wall/' + String(k).padStart(16, '0') + '-' + Math.random().toString(36).slice(2, 6);
+    const loadWall = async (n) => {
+      const ls = await store.list({ prefix: 'wall/' });
+      const keys = (ls.blobs || []).map(b => b.key).sort().slice(-n);
+      const out = [];
+      for (const k of keys) {
+        try { const v = await store.get(k, { type: 'json' }); if (v) out.push(v); } catch (e) {}
+      }
+      return out;
+    };
     if (event.httpMethod === 'POST') {
       const name = await who();
       if (!name) return json(401, { error: '先登录' });
       const text = String(body.text || '').trim().slice(0, 200);
       if (!text) return json(400, { error: '写点什么' });
-      let list = [];
-      try { list = arr(await store.get(KEY_WALL, { type: 'json' }), 300); } catch (e) {}
-      const last = list.filter(x => x.id === name).pop();
-      if (last && Date.now() - last.at < 20000) return json(429, { error: '慢点，20 秒才能发一条' });
+      const recent = await loadWall(30);
+      const last = recent.filter(x => x.id === name).pop();
+      if (last && Date.now() - (+last.at) < 20000) return json(429, { error: '慢点，20 秒才能发一条' });
       const cl = (v, a, b) => Math.max(a, Math.min(b, +v || 0));
-      list.push({
-        id: name, t: text, at: Date.now(),
+      const item = {
+        id: name, t: text, at: Date.now(), k: null,
         x: cl(body.x === undefined ? 50 : body.x, 4, 96),
         y: cl(body.y === undefined ? 50 : body.y, 5, 95),
         r: cl(body.r, -20, 20),
         s: cl(body.s === undefined ? 1 : body.s, 0.8, 1.2),
         c: cl(body.c, 0, 5)
-      });
-      await store.setJSON(KEY_WALL, arr(list, 300));
+      };
+      const key = rk(item.at);
+      await store.setJSON(key, item);
       return json(200, { ok: true });
     }
-    let list = [];
-    try { list = arr(await store.get(KEY_WALL, { type: 'json' }), 300); } catch (e) {}
+    const list = await loadWall(60);
     return json(200, { list: list.reverse() }, { 'Cache-Control': 'no-store' });
   }
 
