@@ -134,6 +134,9 @@ nav a b{display:block;font-size:18px;line-height:1.25;font-weight:400}
 #tm.on{display:flex}
 #dn{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;z-index:84;padding:18px}
 #dn.on{display:flex}
+#ntc{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:86;padding:18px}
+#ntc.on{display:flex}
+#ntc .mbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;width:100%}
 #auth{position:fixed;inset:0;background:#0b0f14;display:none;align-items:center;justify-content:center;z-index:120;padding:20px;overflow:auto}
 #auth.on{display:flex}
 #auth .abox{width:100%;max-width:360px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px}
@@ -655,6 +658,12 @@ nav a.on:before{content:'';position:absolute;top:-8px;left:50%;transform:transla
   <button class="big-btn" id="clockToggle">开始</button>
   <div class="btns"><button id="clockReset">归零</button></div>
 </div>
+<div id="ntc"><div class="mbox" style="max-width:420px">
+  <div id="ntcTitle" style="font-size:15px;font-weight:700;color:var(--txt);margin-bottom:10px"></div>
+  <div id="ntcBody" style="font-size:13.5px;line-height:1.75;color:var(--txt);white-space:pre-wrap;word-break:break-word"></div>
+  <div class="dim" style="font-size:11px;margin-top:12px" id="ntcAt"></div>
+  <button class="pri" style="width:100%;height:42px;margin-top:14px" id="ntcOk">知道了</button>
+</div></div>
 <div id="auth"><div class="abox">
   <div style="font-size:17px;font-weight:700;color:var(--txt);text-align:center">专转本 · ZHIYAN</div>
   <div style="font-size:12px;color:var(--dim);text-align:center;margin:6px 0 16px" id="authTip">用 ID 和密码进入，换手机用同一个 ID 就能同步</div>
@@ -713,8 +722,7 @@ nav a.on:before{content:'';position:absolute;top:-8px;left:50%;transform:transla
 <div id="undo" class="undobar hide"><span>已打卡 <b id="undoT"></b></span><button id="undoB">撤销</button></div>
 <div class="toast" id="toast"></div>
 
-<script>
-// ===== 网页版（iOS/浏览器）桥接：用 fetch 模拟原生接口 =====
+<script>// ===== 网页版（iOS/浏览器）桥接：用 fetch 模拟原生接口 =====
 (function(){
   if(window.Android && window.Android.httpGet) return;
   var W = window;
@@ -747,7 +755,6 @@ nav a.on:before{content:'';position:absolute;top:-8px;left:50%;transform:transla
   };
   try{ if(typeof globalThis!=='undefined') globalThis.Android = W.Android; }catch(e){}
 })();
-
 /* ============== 主题 ============== */
 var THEMES={
  dark:{n:'暗夜',v:{bg:'#0e1116',card:'#161b22',card2:'#1c2330',line:'#252d3a',txt:'#e8edf4',dim:'#8894a6',acc:'#35d39a',acc2:'#4a9eff',warn:'#f2b53c',bad:'#f2555a',okbg:'#12241d',okline:'#1f4d3a',okfg:'#7fbfa0',boxfg:'#0e1116',h0:'#1a2028',h1:'#1f4d3a',h2:'#2a7d5b',h3:'#35d39a'},veil:'rgba(8,10,14,'},
@@ -830,11 +837,11 @@ var PAY_DEF='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAHgAQAAAABVr4M4A
 var DEF={exam:'',target:{en:0,m1:0,m2:0},logs:{},mocks:[],cards:0,autoLand:true,
   title:'AI 学习计划',sub:'',subj:{en:'英语',m1:'科目二',m2:'科目三'},planOn:true,setup:false,goal:'专转本',plan:[],updateDefault:'https://github.com/Zzhiyan44/dday',hours:6,weekGoal:30,lastExport:'',updateUrl:'',skipVer:0,
   ai:{url:'https://api.deepseek.com/v1/chat/completions',model:'deepseek-chat',key:''},
-  theme:'dark',bg:'',blur:6,veil:0.55,ui:0.92,compact:false,lite:false,glassBlur:14,cardBorder:true,days:{},launch:0,donateDone:false,payImg:'',acc:null,
+  theme:'dark',bg:'',blur:6,veil:0.55,ui:0.92,compact:false,lite:false,glassBlur:14,cardBorder:true,days:{},launch:0,donateDone:false,payImg:'',acc:null,lastNotice:'',
   timer:{remain:1500,total:1500,run:false,endAt:0},sessions:[],notes:[],mdone:{},wk:{}};
 var S0=load(), S = S0 || JSON.parse(JSON.stringify(DEF));
 if(S0 && S0.setup===undefined) S.setup=true;
-['exam','target','logs','mocks','cards','autoLand','title','sub','subj','planOn','setup','theme','bg','blur','veil','ui','compact','lite','glassBlur','cardBorder','days','launch','donateDone','payImg','acc','timer','sessions','notes','mdone','wk','goal','plan','ai','hours','weekGoal','lastExport','updateUrl','skipVer'].forEach(function(k){ if(S[k]===undefined) S[k]=JSON.parse(JSON.stringify(DEF[k])); });
+['exam','target','logs','mocks','cards','autoLand','title','sub','subj','planOn','setup','theme','bg','blur','veil','ui','compact','lite','glassBlur','cardBorder','days','launch','donateDone','payImg','acc','lastNotice','timer','sessions','notes','mdone','wk','goal','plan','ai','hours','weekGoal','lastExport','updateUrl','skipVer'].forEach(function(k){ if(S[k]===undefined) S[k]=JSON.parse(JSON.stringify(DEF[k])); });
 ['en','m1','m2'].forEach(function(k){ if(!S.target[k]) S.target[k]=DEF.target[k]; if(!S.subj[k]) S.subj[k]=DEF.subj[k]; });
 if(!S.ai) S.ai=JSON.parse(JSON.stringify(DEF.ai));
 if(!S.setUrl){ if(!S.updateUrl) S.updateUrl=DEF.updateDefault||''; S.setUrl=1; }
@@ -1254,6 +1261,20 @@ function syncDown(cb){
       } else { toast('云端还没有数据，先上传本机'); syncUp(); }
     } else { toast('拉取失败：'+((j&&j.error)||String(text).slice(0,30))); }
     if(cb) cb(ok);
+  });
+}
+function checkNotice(){
+  if(!srv() || isLocal()) return;
+  getJSON('/api/notice?t='+Date.now(),function(ok,text){
+    if(!ok) return;
+    var j=null; try{ j=JSON.parse(text); }catch(e){ return; }
+    if(!j || !j.active || !j.text) return;
+    if(String(j.id)===String(S.lastNotice)) return;
+    window.__ntcId = String(j.id);
+    document.getElementById('ntcTitle').textContent = j.title || '公告';
+    document.getElementById('ntcBody').textContent = j.text;
+    document.getElementById('ntcAt').textContent = j.at ? new Date(j.at).toLocaleString('zh-CN') : '';
+    document.getElementById('ntc').classList.add('on');
   });
 }
 var syncTimer=null;
@@ -2461,6 +2482,10 @@ document.getElementById('keyBox').onclick=function(e){
     toast('已切到 '+p.n+'，接着点「粘贴 Key」');
   }
 };
+document.getElementById('ntcOk').onclick=function(){
+  S.lastNotice=String(window.__ntcId||''); save();
+  document.getElementById('ntc').classList.remove('on');
+};
 document.getElementById('auGo').onclick=doAuth;
 document.getElementById('auSwitch').onclick=function(){ setAuthMode(authMode==='reg'?'login':'reg'); };
 document.getElementById('auOffline').onclick=function(){
@@ -2632,6 +2657,7 @@ setTimeout(function(){
   }catch(e){}
 },3000);
 setTimeout(watchSecs,120);
+setTimeout(function(){ checkNotice(); }, 2500);
 setTimeout(function(){
   if(!S.acc || !S.acc.token){ if(!S.offline) showAuth(); }
   else { refreshAccCard(); }
