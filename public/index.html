@@ -116,8 +116,18 @@ button:active{opacity:.8;transform:scale(.965)}
 .task:active{transform:scale(.975)}
 @keyframes pop{0%{transform:scale(.7)}55%{transform:scale(1.18)}100%{transform:scale(1)}}
 .task.done .box{animation:pop .3s cubic-bezier(.2,.9,.3,1.3)}
-.sec{opacity:0;transform:translateY(16px);transition:opacity .5s ease, transform .5s cubic-bezier(.2,.8,.2,1)}
+.sec{opacity:0;transform:translateY(10px) scale(.995);transition:opacity .26s cubic-bezier(.22,.9,.24,1), transform .3s cubic-bezier(.22,.9,.24,1);will-change:opacity,transform}
 .sec.in{opacity:1;transform:none}
+/* 按下去有回弹，不是死板的方块 */
+button,.mini,nav a,.stk,.card{-webkit-tap-highlight-color:transparent}
+button:active,.mini:active{transform:scale(.955)}
+button,.mini{transition:transform .12s cubic-bezier(.3,1.4,.5,1), background .18s, color .18s, border-color .18s}
+nav a:active{transform:translateY(-1px) scale(.9)}
+nav a.on b{transition:transform .22s cubic-bezier(.3,1.5,.5,1);display:inline-block;transform:translateY(-1px) scale(1.08)}
+.stk{transition:transform .18s cubic-bezier(.3,1.4,.5,1), box-shadow .2s}
+.stk:active{box-shadow:0 6px 16px rgba(0,0,0,.45)}
+#clBody{transition:opacity .2s ease}
+#clBody.fade{opacity:.35}
 nav a{transition:color .2s, transform .15s}
 nav a.on{transform:translateY(-1px)}
 .thm{display:flex;gap:8px;flex-wrap:wrap}
@@ -497,11 +507,11 @@ nav a.on:before{content:'';position:absolute;top:-8px;left:50%;transform:transla
   <section id="v-club" class="sec" data-sec="club">
   <div class="card">
     <div class="row" style="gap:8px">
-      <button class="mini on" id="clWall">留言墙</button>
-      <button class="mini" id="clRoom">自习室</button>
+      <button class="mini on" id="clRoom">自习室</button>
+      <button class="mini" id="clWall">留言墙</button>
       <button class="mini" id="clRank">排行榜</button>
     </div>
-    <div class="dim" style="font-size:11.5px;margin-top:8px" id="clTip">同学之间互相看看，别发广告</div>
+    <div class="dim" style="font-size:11.5px;margin-top:8px" id="clTip">自习室：看谁在学、一起说两句；留言墙贴贴纸；排行榜看本周谁学得多</div>
   </div>
   <div class="card" id="clBody"></div>
 </section>
@@ -664,7 +674,7 @@ nav a.on:before{content:'';position:absolute;top:-8px;left:50%;transform:transla
   <a href="#" data-v="plan"><b>≡</b>计划</a>
   <a href="#" data-v="tool"><b>⏱</b>工具</a>
   <a href="#" data-v="data"><b>▤</b>数据</a>
-  <a href="#" data-v="club"><b>✦</b>圈子</a>
+  <a href="#" data-v="club"><b>◉</b>自习室</a>
   <a href="#" data-v="me"><b>☰</b>我的</a>
 </nav>
 
@@ -1288,7 +1298,7 @@ function syncDown(cb){
 var ntcLast=0;
 
 // ===== 圈子：留言墙 / 自习室 / 排行榜 =====
-var clTab='wall', clTimer=null, clBeat=null, clWallList=[], clRoomData={online:[],msgs:[]}, clRank=[];
+var clTab='room', clTimer=null, clBeat=null, clWallList=[], clRoomData={online:[],msgs:[]}, clRank=[], clMine=[];
 function studyMin(ds){
   var log=S.logs&&S.logs[ds]; if(!log) return 0;
   var got=0;
@@ -1324,17 +1334,21 @@ function clubErr(txt){
   toast(m); return false;
 }
 function renderClub(){
-  ['Wall','Room','Rank'].forEach(function(k,i){
+  ['Room','Wall','Rank'].forEach(function(k,i){
     var b=document.getElementById('cl'+k);
-    if(b) b.classList.toggle('on', ['wall','room','rank'][i]===clTab);
+    if(b) b.classList.toggle('on', ['room','wall','rank'][i]===clTab);
   });
   if(!S.acc||!S.acc.token||isLocal()){
     document.getElementById('clBody').innerHTML='<div class="dim">圈子要先注册账号才能用（本机模式的 ID 只在你这台手机）。</div>';
     return;
   }
-  if(clTab==='wall') drawWall();
-  else if(clTab==='room') drawRoom();
-  else drawRank();
+  var cb=document.getElementById('clBody');
+  if(cb){ cb.classList.add('fade'); setTimeout(function(){
+    if(clTab==='wall') drawWall();
+    else if(clTab==='room') drawRoom();
+    else drawRank();
+    setTimeout(function(){ cb.classList.remove('fade'); }, 60);
+  }, 90); return; }
 }
 function esc2(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function ago(ts){
@@ -1418,7 +1432,7 @@ function drawWall(){
       var t=document.getElementById('wallIn').value.trim();
       if(!t){ toast('写点什么'); return; }
       postJSON('/api/wall',{token:S.acc.token, text:t, x:wallPos.x, y:wallPos.y, r:wallRot, s:wallSize, c:Math.floor(Math.random()*6)}, function(ok2,txt){
-        if(ok2){ toast('已贴上'); drawWall(); }
+        if(ok2){ toast('已贴上'); try{navigator.vibrate&&navigator.vibrate(15);}catch(e){} drawWall(); }
         else{ clubErr(txt); }
       });
     };
@@ -1445,13 +1459,14 @@ function startDanmu(){
   for(var i=0;i<3;i++) setTimeout(push, i*400);
   dmTimer=setInterval(push, 1800);
 }
-function drawRoom(){
+function drawRoom(fast){
   var b=document.getElementById('clBody');
-  b.innerHTML='<div class="dim" style="font-size:12px">正在连接…</div>';
+  if(!fast) b.innerHTML='<div class="dim" style="font-size:12px">正在连接…</div>';
   var beat=function(msg){
-    postJSON('/api/room',{token:S.acc.token, beat:1, focus:(S.plan&&S.plan[0])?'':('',''), msg:msg||''}, function(ok2,txt){
+    if(msg){ try{navigator.vibrate&&navigator.vibrate(12);}catch(e){} clMine.push({id:(S.acc&&S.acc.id)||'我', t:msg, at:Date.now(), local:1}); drawRoom(true); }
+    postJSON('/api/room',{token:S.acc.token, beat:1, focus:'', msg:msg||''}, function(ok2,txt){
       if(!ok2){ clubErr(txt); }
-      if(msg) drawRoom();
+      if(msg){ setTimeout(drawRoom, 1200); }
     });
   };
   getJSON('/api/room?t='+Date.now(), function(ok,text){
@@ -1462,7 +1477,14 @@ function drawRoom(){
       var mine=S.acc&&u.n===S.acc.id;
       return '<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:var(--bg2);border:1px solid var(--line);font-size:11.5px;margin:0 6px 6px 0;color:'+(mine?'var(--acc)':'var(--txt)')+'">● '+esc2(u.n)+'</span>';
     }).join('')||'<span class="dim">现在没人，你第一个</span>';
-    var msgs=(j.msgs||[]).map(function(m){
+    var all=(j.msgs||[]).slice();
+    // 合并本机刚发、还没从服务器读到的
+    clMine.forEach(function(m){
+      var dup=all.some(function(x){ return x.id===m.id && (x.t===m.t) && Math.abs((+x.at)-(+m.at))<120000; });
+      if(!dup) all.push(m);
+    });
+    all.sort(function(a,b){ return (+a.at)-(+b.at); });
+    var msgs=all.map(function(m){
       var mine=S.acc&&m.id===S.acc.id;
       return '<div style="margin:8px 0;display:flex;'+(mine?'justify-content:flex-end':'')+'">'+
         '<div style="max-width:78%;padding:8px 11px;border-radius:12px;background:'+(mine?'var(--acc)':'var(--bg2)')+';color:'+(mine?'#08110d':'var(--txt)')+';font-size:13px;line-height:1.5;word-break:break-word">'+
@@ -2732,9 +2754,9 @@ document.getElementById('ntcOk').onclick=function(){
   S.lastNotice=String(window.__ntcId||''); save();
   document.getElementById('ntc').classList.remove('on');
 };
-['Wall','Room','Rank'].forEach(function(k){
+['Room','Wall','Rank'].forEach(function(k){
   var el=document.getElementById('cl'+k);
-  if(el) el.onclick=function(){ clTab=k.toLowerCase(); if(clTimer){clearInterval(clTimer);clTimer=null;} if(clBeat){clearInterval(clBeat);clBeat=null;} renderClub(); };
+  if(el) el.onclick=function(){ try{navigator.vibrate&&navigator.vibrate(8);}catch(e){} clTab=k.toLowerCase(); if(clTimer){clearInterval(clTimer);clTimer=null;} if(clBeat){clearInterval(clBeat);clBeat=null;} renderClub(); };
 });
 document.getElementById('auGo').onclick=doAuth;
 document.getElementById('auSwitch').onclick=function(){ setAuthMode(authMode==='reg'?'login':'reg'); };
@@ -2806,7 +2828,13 @@ function switchTab(v){
   TABS.forEach(function(k){ var el=document.getElementById('v-'+k); if(el) el.classList.toggle('hide', k!==v); });
   document.querySelectorAll('nav a').forEach(function(a){ a.classList.toggle('on', a.getAttribute('data-v')===v); });
   var el=document.getElementById('v-'+v);
-  if(el){ el.classList.remove('in'); void el.offsetWidth; el.classList.add('in'); }
+  if(el){
+    el.style.transition='none'; el.style.opacity='0'; el.style.transform='translateY(10px) scale(.995)';
+    void el.offsetWidth;
+    el.style.transition=''; el.style.opacity=''; el.style.transform='';
+    el.classList.remove('in'); requestAnimationFrame(function(){ el.classList.add('in'); });
+  }
+  try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
   // 进页就重算，保证各页数字一致
   try{
     renderHead();
