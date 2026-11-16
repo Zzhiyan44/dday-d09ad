@@ -128,7 +128,8 @@ nav a.on b{transition:transform .22s cubic-bezier(.3,1.5,.5,1);display:inline-bl
 .stk:active{box-shadow:0 6px 16px rgba(0,0,0,.45)}
 #clBody{transition:opacity .2s ease}
 #clBody.fade{opacity:.35}
-nav a{transition:color .2s, transform .15s}
+nav a{transition:color .2s, transform .15s;font-size:10.5px}
+nav a b{font-size:15px;line-height:1.15}
 nav a.on{transform:translateY(-1px)}
 .thm{display:flex;gap:8px;flex-wrap:wrap}
 .thm b{width:38px;height:38px;border-radius:12px;border:2px solid var(--line);display:block;cursor:pointer}
@@ -511,7 +512,7 @@ nav a.on:before{content:'';position:absolute;top:-8px;left:50%;transform:transla
       <button class="mini" id="clWall">留言墙</button>
       <button class="mini" id="clRank">排行榜</button>
     </div>
-    <div class="dim" style="font-size:11.5px;margin-top:8px" id="clTip">自习室：看谁在学、一起说两句；留言墙贴贴纸；排行榜看本周谁学得多</div>
+    <div class="dim" style="font-size:11px;margin-top:8px" id="clTip">自习室一起学 · 留言墙贴纸 · 排行榜比本周时长</div>
   </div>
   <div class="card" id="clBody"></div>
 </section>
@@ -1374,19 +1375,22 @@ function drawWall(){
     if(!ok){ b.innerHTML='<div class="dim">连不上服务器</div>'; return; }
     var j={}; try{ j=JSON.parse(text); }catch(e){}
     clWallList=(j.list||[]).slice(0,60);
+    var mineCount=clWallList.filter(function(x){ return S.acc&&x.id===S.acc.id; }).length;
     var sticks=clWallList.map(function(x,i){
       var r=+x.r||0, s=+x.s||1, c=+x.c||0;
       var css=WALL_COLORS[c%WALL_COLORS.length];
+      var mine=S.acc&&x.id===S.acc.id;
       return '<div class="stk" data-i="'+i+'" style="left:'+(+x.x||50)+'%;top:'+(+x.y||50)+'%;'+
-        'transform:translate(-50%,-50%) rotate('+r+'deg) scale('+s.toFixed(2)+');'+css+'">'+
-        '<div class="who">'+esc2(x.id)+'</div>'+esc2(x.t)+'</div>';
+        'transform:translate(-50%,-50%) rotate('+r+'deg) scale('+s.toFixed(2)+');'+css+';'+
+        (mine?';box-shadow:0 0 0 1.5px var(--acc),0 4px 10px rgba(0,0,0,.35)':'')+'">'+
+        '<div class="who">'+esc2(x.id)+(mine?' · 我':'')+'</div>'+esc2(x.t)+'</div>';
     }).join('');
     b.innerHTML=
       '<div class="row" style="justify-content:space-between;margin-bottom:8px">'+
-        '<span class="dim" style="font-size:11.5px">共 '+clWallList.length+' 张 · 点墙上空白处选位置</span>'+
+        '<span class="dim" style="font-size:11.5px">共 '+clWallList.length+' 张'+(mineCount?' · 我贴了 '+mineCount+' 张':'')+' · 点空白处选位置</span>'+
         '<button class="mini" id="dmToggle" style="'+(wallDM?'border-color:var(--acc);color:var(--acc)':'')+'">'+(wallDM?'弹幕 开':'弹幕 关')+'</button>'+
       '</div>'+
-      '<div id="wallBox">'+sticks+'<div id="dmBox"></div></div>'+
+      '<div id="wallBox">'+(sticks||'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px;text-align:center;line-height:1.7">墙上还空着<br>点一下空白处，贴第一张</div>')+'<div id="dmBox"></div></div>'+
       '<div style="margin-top:12px">'+
         '<textarea id="wallIn" placeholder="贴一张…（60 字内更好看）" maxlength="120" style="width:100%;height:62px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);padding:10px 12px;font-size:13px"></textarea>'+
         '<div class="kv" style="margin-top:8px"><span>大小</span><b id="szV">'+wallSize.toFixed(2)+'</b></div>'+
@@ -1464,36 +1468,24 @@ function drawRoom(fast){
   var b=document.getElementById('clBody');
   if(!fast) b.innerHTML='<div class="dim" style="font-size:12px">正在连接…</div>';
   var beat=function(msg){
-    if(msg){ clMine.push({id:(S.acc&&S.acc.id)||'我', t:msg, at:Date.now(), local:1}); drawRoom(true); }
+    if(msg){ clMine.push({id:(S.acc&&S.acc.id)||'我', t:msg, at:Date.now(), local:1}); paintRoom(); }
     postJSON('/api/room',{token:S.acc.token, beat:1, focus:'', msg:msg||''}, function(ok2,txt){
       if(!ok2){ clubErr(txt); }
-      if(msg){ setTimeout(drawRoom, 1200); }
+      if(msg){ setTimeout(function(){ pullRoom(); }, 1200); }
     });
   };
-  getJSON('/api/room?t='+Date.now(), function(ok,text){
-    if(!ok){ b.innerHTML='<div class="dim">连不上服务器</div>'; return; }
-    var j={}; try{ j=JSON.parse(text); }catch(e){}
-    clRoomData=j;
-    var online=(j.online||[]).map(function(u){
-      var mine=S.acc&&u.n===S.acc.id;
-      return '<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:var(--bg2);border:1px solid var(--line);font-size:11.5px;margin:0 6px 6px 0;color:'+(mine?'var(--acc)':'var(--txt)')+'">● '+esc2(u.n)+'</span>';
-    }).join('')||'<span class="dim">现在没人，你第一个</span>';
-    var all=(j.msgs||[]).slice();
-    // 合并本机刚发、还没从服务器读到的
-    clMine.forEach(function(m){
-      var dup=all.some(function(x){ return x.id===m.id && (x.t===m.t) && Math.abs((+x.at)-(+m.at))<120000; });
-      if(!dup) all.push(m);
+  var pullRoom=function(){
+    getJSON('/api/room?t='+Date.now(), function(ok,text){
+      if(!ok){ if(!document.getElementById('roomList')) b.innerHTML='<div class="dim">连不上服务器，稍后再试</div>'; if(!ok) clubErr(text); return; }
+      var j={}; try{ j=JSON.parse(text); }catch(e){}
+      clRoomData=j;
+      paintRoom();
     });
-    all.sort(function(a,b){ return (+a.at)-(+b.at); });
-    var msgs=all.map(function(m){
-      var mine=S.acc&&m.id===S.acc.id;
-      return '<div style="margin:8px 0;display:flex;'+(mine?'justify-content:flex-end':'')+'">'+
-        '<div style="max-width:78%;padding:8px 11px;border-radius:12px;background:'+(mine?'var(--acc)':'var(--bg2)')+';color:'+(mine?'#08110d':'var(--txt)')+';font-size:13px;line-height:1.5;word-break:break-word">'+
-        (mine?'':'<div style="font-size:10.5px;opacity:.75;margin-bottom:3px">'+esc2(m.id)+'</div>')+esc2(m.t)+'</div></div>';
-    }).join('')||'<div class="dim">还没有人说话，打个招呼？</div>';
-    b.innerHTML='<div class="dim" style="font-size:11.5px">在线 '+(j.online||[]).length+' 人 · 3 分钟内有动静算在线</div>'+
-      '<div style="margin:8px 0 12px">'+online+'</div>'+
-      '<div style="max-height:44vh;overflow:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px 0">'+msgs+'</div>'+
+  };
+  if(!document.getElementById('roomList')) {
+    b.innerHTML='<div class="dim" style="font-size:11.5px" id="roomOnTxt">在线 —</div>'+
+      '<div style="margin:8px 0 12px" id="roomOn"></div>'+
+      '<div id="roomList" style="max-height:42vh;overflow:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px 0;-webkit-overflow-scrolling:touch"></div>'+
       '<div class="row" style="gap:8px;margin-top:10px"><input id="roomIn" placeholder="说句话…" style="flex:1;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);padding:0 12px;font-size:13px">'+
       '<button class="pri" style="height:40px;width:70px" id="roomSend">发送</button></div>';
     document.getElementById('roomSend').onclick=function(){
@@ -1502,12 +1494,62 @@ function drawRoom(fast){
       document.getElementById('roomIn').value='';
       beat(t);
     };
-    // 心跳 + 轮询
-    if(clBeat) clearInterval(clBeat);
-    clBeat=setInterval(function(){ if(clTab==='room' && curTab==='club') beat(''); else { clearInterval(clBeat); clBeat=null; } }, 60000);
-    if(clTimer) clearInterval(clTimer);
-    clTimer=setInterval(function(){ if(clTab==='room' && curTab==='club') drawRoom(); else { clearInterval(clTimer); clTimer=null; } }, 8000);
+  }
+  pullRoom();
+  if(clBeat) clearInterval(clBeat);
+  clBeat=setInterval(function(){ if(clTab==='room' && curTab==='club') beat(''); else { clearInterval(clBeat); clBeat=null; } }, 60000);
+  if(clTimer) clearInterval(clTimer);
+  clTimer=setInterval(function(){ if(clTab==='room' && curTab==='club') pullRoom(); else { clearInterval(clTimer); clTimer=null; } }, 9000);
+}
+// 只增量更新：不整块重建，避免闪和跳
+function paintRoom(){
+  var onTxt=document.getElementById('roomOnTxt'), on=document.getElementById('roomOn'), list=document.getElementById('roomList');
+  if(!list) return;
+  var j=clRoomData||{};
+  var names=(j.online||[]).map(function(u){ return u.n; });
+  if(onTxt) onTxt.textContent='在线 '+(j.online||[]).length+' 人 · 3 分钟内有动静算在线';
+  var sig=names.join(',');
+  if(on && on.getAttribute('data-sig')!==sig){
+    on.setAttribute('data-sig', sig);
+    on.innerHTML=(j.online||[]).map(function(u){
+      var mine=S.acc&&u.n===S.acc.id;
+      return '<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:var(--bg2);border:1px solid var(--line);font-size:11.5px;margin:0 6px 6px 0;color:'+(mine?'var(--acc)':'var(--txt)')+'">● '+esc2(u.n)+'</span>';
+    }).join('')||'<span class="dim">现在没人，你第一个</span>';
+  }
+  var all=(j.msgs||[]).slice();
+  clMine.forEach(function(m){
+    var dup=all.some(function(x){ return x.id===m.id && x.t===m.t && Math.abs((+x.at)-(+m.at))<120000; });
+    if(!dup) all.push(m);
   });
+  all.sort(function(a,b){ return (+a.at)-(+b.at); });
+  var shown=+(list.getAttribute('data-n')||0);
+  var nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+  if(all.length===shown && shown>0) return;
+  if(all.length>shown && shown>0){
+    // 只补充新消息
+    for(var i=shown;i<all.length;i++) list.appendChild(msgNode(all[i]));
+  } else {
+    list.innerHTML='';
+    all.forEach(function(m){ list.appendChild(msgNode(m)); });
+    if(!all.length) list.innerHTML='<div class="dim">还没有人说话，打个招呼？</div>';
+  }
+  list.setAttribute('data-n', String(all.length));
+  if(nearBottom) list.scrollTop=list.scrollHeight;
+}
+function msgNode(m){
+  var mine=S.acc&&m.id===S.acc.id;
+  var d=document.createElement('div');
+  d.style.cssText='margin:8px 0;display:flex;'+(mine?'justify-content:flex-end':'');
+  var b=document.createElement('div');
+  b.style.cssText='max-width:78%;padding:8px 11px;border-radius:12px;font-size:13px;line-height:1.5;word-break:break-word;'+
+    (mine?'background:var(--acc);color:#08110d':'background:var(--bg2);color:var(--txt)');
+  if(!mine){
+    var who=document.createElement('div');
+    who.style.cssText='font-size:10.5px;opacity:.75;margin-bottom:3px';
+    who.textContent=m.id; b.appendChild(who);
+  }
+  b.appendChild(document.createTextNode(m.t));
+  d.appendChild(b); return d;
 }
 function drawRank(){
   document.getElementById('clBody').innerHTML='<div class="dim" style="font-size:12px">正在加载…</div>';
@@ -1520,11 +1562,15 @@ function drawRank(){
     var rows=clRank.map(function(x,i){
       var me=S.acc&&x.n===S.acc.id;
       var medal=['🥇','🥈','🥉'][i]||('#'+(i+1));
-      return '<div class="row" style="justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)'+(me?';color:var(--acc)':'')+'">'+
+      var top=i<3?'background:var(--bg2);border-radius:10px;padding:9px 10px;margin-bottom:6px':'padding:9px 0;border-bottom:1px solid var(--line)';
+      return '<div class="row" style="justify-content:space-between;'+(me?top+';box-shadow:inset 0 0 0 1.5px var(--acc)':top)+'">'+
         '<span style="font-size:13px">'+medal+' '+esc2(x.n)+(me?'（我）':'')+'</span>'+
         '<span style="font-size:12.5px">本周 '+Math.round(x.week||0)+' 分 · 今日 '+Math.round(x.today||0)+'</span></div>';
-    }).join('')||'<div class="dim">还没有人上榜，你先学 25 分钟。</div>';
-    var myLine=mine?('我：本周 '+Math.round(mine.week)+' 分 · 总计 '+Math.round(mine.total)+' 分'):('我的：本周 '+(myMinutes().week)+' 分（还没上榜，学完自动上报）');
+    }).join('')||'<div class="dim" style="line-height:1.8">还没有人上榜。<br>完成今日任务或跑一次计时器，就会自动计入。</div>';
+    var myRank=0; clRank.forEach(function(x,i){ if(S.acc&&x.n===S.acc.id) myRank=i+1; });
+    var mm=myMinutes();
+    var myLine=mine?('我的排名：第 '+myRank+' 名 · 本周 '+Math.round(mine.week)+' 分 · 累计 '+Math.round(mine.total)+' 分')
+                   :('我的：本周 '+mm.week+' 分 · 今日 '+mm.today+' 分（学完自动上榜）');
     document.getElementById('clBody').innerHTML=rows+
       '<div class="dim" style="font-size:11.5px;margin-top:12px">'+myLine+'</div>'+
       '<div class="dim" style="font-size:11px;margin-top:6px">时长来自「今日任务的完成分钟 + 计时器专注」，自动上报，不用手填</div>';
