@@ -330,7 +330,15 @@ document.getElementById('relGo').onclick=function(){
       try { list = arr(await store.get(KEY_WALL, { type: 'json' }), 300); } catch (e) {}
       const last = list.filter(x => x.id === name).pop();
       if (last && Date.now() - last.at < 20000) return json(429, { error: '慢点，20 秒才能发一条' });
-      list.push({ id: name, t: text, at: Date.now() });
+      const cl = (v, a, b) => Math.max(a, Math.min(b, +v || 0));
+      list.push({
+        id: name, t: text, at: Date.now(),
+        x: cl(body.x === undefined ? 50 : body.x, 4, 96),
+        y: cl(body.y === undefined ? 50 : body.y, 5, 95),
+        r: cl(body.r, -20, 20),
+        s: cl(body.s === undefined ? 1 : body.s, 0.8, 1.2),
+        c: cl(body.c, 0, 5)
+      });
       await store.setJSON(KEY_WALL, arr(list, 300));
       return json(200, { ok: true });
     }
