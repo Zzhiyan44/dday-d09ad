@@ -1432,7 +1432,7 @@ function drawWall(){
       var t=document.getElementById('wallIn').value.trim();
       if(!t){ toast('写点什么'); return; }
       postJSON('/api/wall',{token:S.acc.token, text:t, x:wallPos.x, y:wallPos.y, r:wallRot, s:wallSize, c:Math.floor(Math.random()*6)}, function(ok2,txt){
-        if(ok2){ toast('已贴上'); try{navigator.vibrate&&navigator.vibrate(15);}catch(e){} drawWall(); }
+        if(ok2){ toast('已贴上'); drawWall(); }
         else{ clubErr(txt); }
       });
     };
@@ -1463,7 +1463,7 @@ function drawRoom(fast){
   var b=document.getElementById('clBody');
   if(!fast) b.innerHTML='<div class="dim" style="font-size:12px">正在连接…</div>';
   var beat=function(msg){
-    if(msg){ try{navigator.vibrate&&navigator.vibrate(12);}catch(e){} clMine.push({id:(S.acc&&S.acc.id)||'我', t:msg, at:Date.now(), local:1}); drawRoom(true); }
+    if(msg){ clMine.push({id:(S.acc&&S.acc.id)||'我', t:msg, at:Date.now(), local:1}); drawRoom(true); }
     postJSON('/api/room',{token:S.acc.token, beat:1, focus:'', msg:msg||''}, function(ok2,txt){
       if(!ok2){ clubErr(txt); }
       if(msg){ setTimeout(drawRoom, 1200); }
@@ -2756,7 +2756,7 @@ document.getElementById('ntcOk').onclick=function(){
 };
 ['Room','Wall','Rank'].forEach(function(k){
   var el=document.getElementById('cl'+k);
-  if(el) el.onclick=function(){ try{navigator.vibrate&&navigator.vibrate(8);}catch(e){} clTab=k.toLowerCase(); if(clTimer){clearInterval(clTimer);clTimer=null;} if(clBeat){clearInterval(clBeat);clBeat=null;} renderClub(); };
+  if(el) el.onclick=function(){ clTab=k.toLowerCase(); if(clTimer){clearInterval(clTimer);clTimer=null;} if(clBeat){clearInterval(clBeat);clBeat=null;} renderClub(); };
 });
 document.getElementById('auGo').onclick=doAuth;
 document.getElementById('auSwitch').onclick=function(){ setAuthMode(authMode==='reg'?'login':'reg'); };
@@ -2834,7 +2834,7 @@ function switchTab(v){
     el.style.transition=''; el.style.opacity=''; el.style.transform='';
     el.classList.remove('in'); requestAnimationFrame(function(){ el.classList.add('in'); });
   }
-  try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
+
   // 进页就重算，保证各页数字一致
   try{
     renderHead();
