@@ -99,6 +99,33 @@ button{background:#35d39a;color:#08110d;border:0;font-weight:600}</style>
     };
   }
 
+  // ---------- 版本检查（服务器去取 GitHub，客户端只连本服务）----------
+  if (path.endsWith('/update')) {
+    try {
+      const r = await fetch('https://api.github.com/repos/Zzhiyan44/dday/releases/latest', {
+        headers: { 'User-Agent': 'zhiyan-sync', 'Accept': 'application/vnd.github+json' }
+      });
+      if (!r.ok) return json(502, { error: 'github ' + r.status });
+      const rel = await r.json();
+      const tag = String(rel.tag_name || '');
+      const m = tag.match(/(\d+)\.(\d+)/);
+      const vc = m ? (+m[1]) * 1000 + (+m[2]) : 0;
+      const asset = (rel.assets || []).find(a => /\.apk$/i.test(a.name || ''));
+      const gh = asset ? asset.browser_download_url : '';
+      const list = gh ? ['https://ghfast.top/' + gh, 'https://ghproxy.net/' + gh, gh] : [];
+      list.push('https://cdn.jsdelivr.net/gh/Zzhiyan44/dday@latest/dist/app.apk');
+      return json(200, {
+        versionCode: vc,
+        versionName: tag.replace(/^v/i, ''),
+        notes: String(rel.body || '').slice(0, 200),
+        publishedAt: rel.published_at || '',
+        apk: list
+      }, { 'Cache-Control': 'public, max-age=300' });
+    } catch (e) {
+      return json(502, { error: 'fetch failed: ' + String(e.message).slice(0, 60) });
+    }
+  }
+
   // ---------- 用户接口 ----------
   if (path.endsWith('/register')) {
     const name = String(body.id || '').trim(), pw = String(body.pass || '');
