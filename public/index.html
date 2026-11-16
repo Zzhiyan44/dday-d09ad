@@ -1313,6 +1313,16 @@ function reportRank(){
   var m=myMinutes();
   postJSON('/api/rank',{token:S.acc.token, today:m.today, week:m.week, total:m.total},function(){});
 }
+function clubErr(txt){
+  var e={}; try{ e=JSON.parse(txt); }catch(x){}
+  var m=e.error||'操作失败';
+  if(/登录/.test(m)){
+    document.getElementById('clBody').innerHTML='<div class="dim">登录已过期。<br>去「我的」点「退出」，再用同一个 ID 登录一次就能用圈子。</div>';
+    toast('登录已过期，重新登录');
+    return true;
+  }
+  toast(m); return false;
+}
 function renderClub(){
   ['Wall','Room','Rank'].forEach(function(k,i){
     var b=document.getElementById('cl'+k);
@@ -1409,7 +1419,7 @@ function drawWall(){
       if(!t){ toast('写点什么'); return; }
       postJSON('/api/wall',{token:S.acc.token, text:t, x:wallPos.x, y:wallPos.y, r:wallRot, s:wallSize, c:Math.floor(Math.random()*6)}, function(ok2,txt){
         if(ok2){ toast('已贴上'); drawWall(); }
-        else{ var e={}; try{ e=JSON.parse(txt); }catch(x){} toast(e.error||'发送失败'); }
+        else{ clubErr(txt); }
       });
     };
     if(wallDM) startDanmu();
@@ -1440,7 +1450,7 @@ function drawRoom(){
   b.innerHTML='<div class="dim" style="font-size:12px">正在连接…</div>';
   var beat=function(msg){
     postJSON('/api/room',{token:S.acc.token, beat:1, focus:(S.plan&&S.plan[0])?'':('',''), msg:msg||''}, function(ok2,txt){
-      if(!ok2){ var e={}; try{e=JSON.parse(txt);}catch(x){} if(e.error) toast(e.error); }
+      if(!ok2){ clubErr(txt); }
       if(msg) drawRoom();
     });
   };
