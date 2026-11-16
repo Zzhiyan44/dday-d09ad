@@ -34,7 +34,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' }, body: '' };
   if (!getStore) return json(500, { error: '服务端缺少 @netlify/blobs' });
   try { if (typeof connectLambda === 'function') connectLambda(event); } catch (e) {}
-  const store = getStore({ name: 'zhiyan', consistency: 'strong' });
+  const store = getStore({ name: 'zhiyan' });
   const qs = event.queryStringParameters || {};
   const path = (event.path || '').replace(/\/+$/, '');
   let body = {};
