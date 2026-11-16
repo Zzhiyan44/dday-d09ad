@@ -326,14 +326,14 @@ nav a.on:before{content:'';position:absolute;top:-8px;left:50%;transform:transla
 .dim{font-size:var(--fs-xs);line-height:1.6}
 .mk{padding:10px 0;font-size:var(--fs-s)}
 </style>
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0e1116">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="专转本">
-<link rel="apple-touch-icon" href="/icon180.png">
-<link rel="icon" href="/icon192.png">
+<link rel="apple-touch-icon" href="icon180.png">
+<link rel="icon" href="icon192.png">
 </head>
 <body>
 <div id="bg"></div><div id="veil"></div>
@@ -706,6 +706,10 @@ nav a.on:before{content:'';position:absolute;top:-8px;left:50%;transform:transla
   <button class="pri" style="width:100%;height:46px;font-size:15px" id="auGo">注册并进入</button>
   <button style="width:100%;height:42px;margin-top:8px" id="auSwitch">已有 ID？去登录</button>
   <div id="auMsg" style="font-size:12px;color:var(--warn);margin-top:12px;text-align:center;min-height:16px"></div>
+  <div style="margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(53,211,154,.45);background:rgba(53,211,154,.08)">
+    <div style="font-size:12.5px;font-weight:700;color:var(--acc);margin-bottom:4px">⚠ 注册后请务必填一次 AI Key</div>
+    <div style="font-size:11.5px;line-height:1.65;color:var(--txt)">不填 Key：只能套用<b>内置固定模板</b>，科目、时长、周次都不会按你的情况变。<br>填了 Key：AI 才会读你的<b>基础水平、每天能学几小时、考试科目</b>，给你排出真正对得上的计划，也能按进度随时重排。<br>位置：<b>我的 → AI 计划助手</b>，Key 只存在这台手机上。</div>
+  </div>
   <div style="margin-top:14px;border-top:1px dashed var(--line);padding-top:12px">
     <div class="dim" style="font-size:11.5px;margin-bottom:6px">服务器地址（留空 = 只用本机；填了才能跨设备同步）</div>
     <input id="auSrv" placeholder="http://你的服务器:8899" style="font-size:12.5px">
@@ -870,11 +874,11 @@ var PAY_DEF='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAHgAQAAAABVr4M4A
 var DEF={exam:'',target:{en:0,m1:0,m2:0},logs:{},mocks:[],cards:0,autoLand:true,
   title:'AI 学习计划',sub:'',subj:{en:'英语',m1:'科目二',m2:'科目三'},planOn:true,setup:false,goal:'专转本',plan:[],updateDefault:'https://github.com/Zzhiyan44/dday',hours:6,weekGoal:30,lastExport:'',updateUrl:'',skipVer:0,
   ai:{url:'https://api.deepseek.com/v1/chat/completions',model:'deepseek-chat',key:''},
-  theme:'dark',bg:'',blur:6,veil:0.55,ui:0.92,compact:false,lite:false,glassBlur:14,cardBorder:true,days:{},launch:0,donateDone:false,payImg:'',acc:null,lastNotice:'',
+  theme:'dark',bg:'',blur:6,veil:0.55,ui:0.92,compact:false,lite:false,glassBlur:14,cardBorder:true,days:{},launch:0,donateDone:false,payImg:'',acc:null,lastNotice:'',keyTip:0,
   timer:{remain:1500,total:1500,run:false,endAt:0},sessions:[],notes:[],mdone:{},wk:{}};
 var S0=load(), S = S0 || JSON.parse(JSON.stringify(DEF));
 if(S0 && S0.setup===undefined) S.setup=true;
-['exam','target','logs','mocks','cards','autoLand','title','sub','subj','planOn','setup','theme','bg','blur','veil','ui','compact','lite','glassBlur','cardBorder','days','launch','donateDone','payImg','acc','lastNotice','timer','sessions','notes','mdone','wk','goal','plan','ai','hours','weekGoal','lastExport','updateUrl','skipVer'].forEach(function(k){ if(S[k]===undefined) S[k]=JSON.parse(JSON.stringify(DEF[k])); });
+['exam','target','logs','mocks','cards','autoLand','title','sub','subj','planOn','setup','theme','bg','blur','veil','ui','compact','lite','glassBlur','cardBorder','days','launch','donateDone','payImg','acc','lastNotice','keyTip','timer','sessions','notes','mdone','wk','goal','plan','ai','hours','weekGoal','lastExport','updateUrl','skipVer'].forEach(function(k){ if(S[k]===undefined) S[k]=JSON.parse(JSON.stringify(DEF[k])); });
 ['en','m1','m2'].forEach(function(k){ if(!S.target[k]) S.target[k]=DEF.target[k]; if(!S.subj[k]) S.subj[k]=DEF.subj[k]; });
 if(!S.ai) S.ai=JSON.parse(JSON.stringify(DEF.ai));
 if(!S.setUrl){ if(!S.updateUrl) S.updateUrl=DEF.updateDefault||''; S.setUrl=1; }
@@ -1575,6 +1579,37 @@ function drawRank(){
       '<div class="dim" style="font-size:11.5px;margin-top:12px">'+myLine+'</div>'+
       '<div class="dim" style="font-size:11px;margin-top:6px">时长来自「今日任务的完成分钟 + 计时器专注」，自动上报，不用手填</div>';
   });
+}
+var KEY_TIP_GAP = 8*3600*1000;
+function needKeyTip(){ return !(S.ai && String(S.ai.key||'').trim()); }
+function checkKeyTip(){
+  if(!S.setup) return;
+  if(!needKeyTip()) return;
+  if(Date.now() - (+S.keyTip||0) < KEY_TIP_GAP) return;
+  S.keyTip = Date.now(); save();
+  document.getElementById('ntcTitle').textContent = '还没填 AI Key';
+  document.getElementById('ntcBody').textContent =
+    '现在用的是内置固定模板：科目、时长、周次都按默认来，不会跟着你的情况变。\n\n' +
+    '填一次 Key（我的 → AI 计划助手），AI 才会读你的基础水平、每天能学几小时、目标院校科目，' +
+    '给你排出真正能执行的计划，也能随时按进度重排。\n\nKey 只存在这台手机上，不上传。';
+  document.getElementById('ntcAt').textContent = '每 8 小时提醒一次，填好后不再出现';
+  var ok=document.getElementById('ntcOk');
+  ok.textContent='去填写';
+  ok.onclick=function(){
+    document.getElementById('ntc').classList.remove('on');
+    switchTab('me');
+    setTimeout(function(){ try{ var el=document.getElementById('aiKey'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.focus(); } }catch(e){} }, 260);
+    restoreNtcOk();
+  };
+  document.getElementById('ntc').classList.add('on');
+}
+function restoreNtcOk(){
+  var ok=document.getElementById('ntcOk');
+  ok.textContent='知道了';
+  ok.onclick=function(){
+    S.lastNotice=String(window.__ntcId||''); save();
+    document.getElementById('ntc').classList.remove('on');
+  };
 }
 function checkNotice(){
   if(!srv() || isLocal()) return;
@@ -2324,6 +2359,7 @@ function renderMe(){
   document.getElementById('aiUrl').value=S.ai.url||'';
   document.getElementById('aiModel').value=S.ai.model||'';
   document.getElementById('aiKey').value=S.ai.key||'';
+  if(String(S.ai.key||'').trim()) S.keyTip=0;
   document.getElementById('updUrl').value=S.updateUrl||'';
   var vn=nativeVerName(), vc=nativeVerCode();
   document.getElementById('verTxt').textContent = vn? ('v'+vn+(vc?(' ('+vc+')'):'')) : 'v2.2';
@@ -2727,7 +2763,7 @@ document.getElementById('suAI').onclick=function(){
 };
 document.getElementById('updCheck').onclick=function(){
   S.updateUrl=document.getElementById('updUrl').value.trim();
-  save(); checkUpdate(false);
+  save(); if(window.Android && window.Android.httpGet) checkUpdate(false);
 };
 document.getElementById('aiCopyBtn').onclick=function(){
   var t=S.lastAiRaw||'';
@@ -2973,7 +3009,7 @@ var _fixed=repairPlan();
 renderAll();
 if(_fixed) setTimeout(function(){ toast('已修复 '+_fixed+' 周的乱码内容'); }, 900);
 onOrient();
-setTimeout(function(){ if(S.updateUrl) checkUpdate(true); },2000);
+if(window.Android && window.Android.httpGet) setTimeout(function(){ if(S.updateUrl) checkUpdate(true); },2000);
 // 默认：本周还没排任务且有 Key，就自动排一次
 setTimeout(function(){
   try{
@@ -2998,9 +3034,9 @@ if(!(window.Android && window.Android.httpGet)){
     var nu=document.getElementById('updNote'); if(nu) nu.textContent='当前是网页版（iPhone/浏览器），没有安装包，所以不需要下载。';
   }
 }
-setTimeout(function(){ checkNotice(); }, 2500);
+setTimeout(function(){ checkNotice(); checkKeyTip(); }, 2500);
 document.addEventListener('visibilitychange', function(){
-  if(!document.hidden) checkNotice();
+  if(!document.hidden){ checkNotice(); checkKeyTip(); }
 });
 window.addEventListener('pageshow', function(){ checkNotice(); });
 setTimeout(function(){
@@ -3012,7 +3048,7 @@ setTimeout(function(){
 },1500);
 </script>
 <script>
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(function(){}); }
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>
 </body>
 </html>
