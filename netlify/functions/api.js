@@ -292,7 +292,8 @@ document.getElementById('relGo').onclick=function(){
     const u = db.users[name];
     if (!u) return json(404, { error: '没有这个 ID，先注册' });
     if (u.hash !== h(String(body.pass || ''), u.salt)) return json(403, { error: '密码不对' });
-    u.token = tok(); u.lastSync = Date.now();
+    if (!u.token) u.token = tok();
+    u.lastSync = Date.now();
     await writeDB(store, db);
     return json(200, { ok: true, id: name, token: u.token, hasData: !!u.data });
   }
@@ -314,9 +315,15 @@ document.getElementById('relGo').onclick=function(){
   }
   // ---------- 留言墙 / 自习室 / 排行榜 ----------
   const who = async () => {
-    const db = await readDB(store);
-    const n = Object.keys(db.users).find(k => db.users[k].token === (body.token || qs.token));
-    return n || null;
+    const tk = body.token || qs.token;
+    if (!tk) return null;
+    for (let i = 0; i < 3; i++) {
+      const db = await readDB(store);
+      const n = Object.keys(db.users || {}).find(k => db.users[k].token === tk);
+      if (n) return n;
+      await new Promise(r => setTimeout(r, 400));
+    }
+    return null;
   };
   const arr = (v, n) => Array.isArray(v) ? v.slice(-n) : [];
 
