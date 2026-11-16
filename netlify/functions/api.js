@@ -17,6 +17,9 @@ const KEY_USERS = 'users.json';
 const KEY_NOTICE = 'notice.json';
 const KEY_REL = 'release.json';
 const KEY_APK = 'app.apk';
+const KEY_WALL = 'wall.json';
+const KEY_ROOM = 'room.json';
+const KEY_RANK = 'rank.json';
 
 function h(pass, salt) { return crypto.createHash('sha256').update(salt + ':' + pass).digest('hex'); }
 function tok() { return crypto.randomBytes(24).toString('hex'); }
@@ -181,8 +184,9 @@ document.getElementById('relGo').onclick=function(){
   if (path.endsWith('/notice') && !path.endsWith('/admin/notice')) {
     let n = null;
     try { n = await store.get(KEY_NOTICE, { type: 'json' }); } catch (e) {}
-    if (!n || !n.active) return json(200, { active: false });
-    return json(200, { active: true, id: n.id, title: n.title || '', text: n.text || '', at: n.at || 0 });
+    const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' };
+    if (!n || !n.active) return json(200, { active: false }, NO_STORE);
+    return json(200, { active: true, id: n.id, title: n.title || '', text: n.text || '', at: n.at || 0 }, NO_STORE);
   }
 
   // ---------- 版本检查（服务器去取 GitHub，客户端只连本服务）----------
@@ -308,5 +312,79 @@ document.getElementById('relGo').onclick=function(){
     await writeDB(store, db);
     return json(200, { ok: true, id: name, data: db.users[name].data });
   }
+  // ---------- 留言墙 / 自习室 / 排行榜 ----------
+  const who = async () => {
+    const db = await readDB(store);
+    const n = Object.keys(db.users).find(k => db.users[k].token === (body.token || qs.token));
+    return n || null;
+  };
+  const arr = (v, n) => Array.isArray(v) ? v.slice(-n) : [];
+
+  if (path.endsWith('/wall')) {
+    if (event.httpMethod === 'POST') {
+      const name = await who();
+      if (!name) return json(401, { error: '先登录' });
+      const text = String(body.text || '').trim().slice(0, 200);
+      if (!text) return json(400, { error: '写点什么' });
+      let list = [];
+      try { list = arr(await store.get(KEY_WALL, { type: 'json' }), 300); } catch (e) {}
+      const last = list.filter(x => x.id === name).pop();
+      if (last && Date.now() - last.at < 20000) return json(429, { error: '慢点，20 秒才能发一条' });
+      list.push({ id: name, t: text, at: Date.now() });
+      await store.setJSON(KEY_WALL, arr(list, 300));
+      return json(200, { ok: true });
+    }
+    let list = [];
+    try { list = arr(await store.get(KEY_WALL, { type: 'json' }), 300); } catch (e) {}
+    return json(200, { list: list.reverse() }, { 'Cache-Control': 'no-store' });
+  }
+
+  if (path.endsWith('/room')) {
+    let room = { msgs: [], online: {} };
+    try { room = (await store.get(KEY_ROOM, { type: 'json' })) || room; } catch (e) {}
+    if (event.httpMethod === 'POST') {
+      const name = await who();
+      if (!name) return json(401, { error: '先登录' });
+      const now = Date.now();
+      room.online = room.online || {};
+      room.online[name] = { at: now, focus: String(body.focus || '').slice(0, 20) };
+      const text = String(body.msg || '').trim().slice(0, 200);
+      if (text) {
+        room.msgs = arr(room.msgs, 120);
+        const mine = room.msgs.filter(x => x.id === name).pop();
+        if (mine && now - mine.at < 3000) return json(429, { error: '慢点' });
+        room.msgs.push({ id: name, t: text, at: now });
+        room.msgs = arr(room.msgs, 120);
+      }
+      await store.setJSON(KEY_ROOM, room);
+    }
+    const now = Date.now();
+    const online = Object.keys(room.online || {})
+      .filter(k => now - (room.online[k].at || 0) < 180000)
+      .map(k => ({ n: k, focus: room.online[k].focus || '' }));
+    return json(200, { online, msgs: arr(room.msgs, 60) }, { 'Cache-Control': 'no-store' });
+  }
+
+  if (path.endsWith('/rank')) {
+    let rk = { users: {} };
+    try { rk = (await store.get(KEY_RANK, { type: 'json' })) || rk; } catch (e) {}
+    if (event.httpMethod === 'POST') {
+      const name = await who();
+      if (!name) return json(401, { error: '先登录' });
+      rk.users = rk.users || {};
+      rk.users[name] = {
+        today: Math.max(0, Math.min(1440, +body.today || 0)),
+        week: Math.max(0, Math.min(10080, +body.week || 0)),
+        total: Math.max(0, Math.min(200000, +body.total || 0)),
+        at: Date.now()
+      };
+      await store.setJSON(KEY_RANK, rk);
+      return json(200, { ok: true });
+    }
+    const list = Object.keys(rk.users || {}).map(k => ({ n: k, ...rk.users[k] }))
+      .sort((a, b) => (b.week || 0) - (a.week || 0)).slice(0, 30);
+    return json(200, { list }, { 'Cache-Control': 'no-store' });
+  }
+
   return json(404, { error: 'not found', path });
 };
