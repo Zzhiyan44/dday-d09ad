@@ -1,7 +1,7 @@
 // 专转本 ZHIYAN · 账号同步（Netlify Function + Blobs）
 const crypto = require('crypto');
-let getStore;
-try { getStore = require('@netlify/blobs').getStore; } catch (e) { getStore = null; }
+let getStore, connectLambda;
+try { const b = require('@netlify/blobs'); getStore = b.getStore; connectLambda = b.connectLambda; } catch (e) { getStore = null; }
 
 const ADMIN_PASS = process.env.ADMIN_PASS || 'zhiyan2026';
 const KEY_USERS = 'users.json';
@@ -33,6 +33,7 @@ function json(code, obj, extra) {
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' }, body: '' };
   if (!getStore) return json(500, { error: '服务端缺少 @netlify/blobs' });
+  try { if (typeof connectLambda === 'function') connectLambda(event); } catch (e) {}
   const store = getStore({ name: 'zhiyan', consistency: 'strong' });
   const qs = event.queryStringParameters || {};
   const path = (event.path || '').replace(/\/+$/, '');
