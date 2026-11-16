@@ -61,7 +61,7 @@ exports.handler = async (event) => {
     }
   } catch (e) { body = {}; }
 
-  const isAdminRoute = path.endsWith('/admin') || path.endsWith('/admin/login') || path.endsWith('/admin/logout') || qs.admin;
+  const isAdminRoute = path.indexOf('/admin') >= 0 || qs.admin;
 
   // ---------- 后台（仅作者，密码登录）----------
   if (isAdminRoute) {
@@ -242,12 +242,6 @@ document.getElementById('relGo').onclick=function(){
   }
 
   // ---------- 公告 ----------
-  if (path.endsWith('/notice') && !path.endsWith('/admin/notice')) {
-    let n = null;
-    try { n = await store.get(KEY_NOTICE, { type: 'json' }); } catch (e) {}
-    if (!n || !n.active) return json(200, { active: false });
-    return json(200, { active: true, id: n.id, title: n.title || '', text: n.text || '', at: n.at || 0 });
-  }
 
   // ---------- 版本检查（服务器去取 GitHub，客户端只连本服务）----------
   if (path.endsWith('/update')) {
