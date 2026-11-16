@@ -293,13 +293,16 @@ document.getElementById('relGo').onclick=function(){
     if (!u) return json(404, { error: '没有这个 ID，先注册' });
     if (u.hash !== h(String(body.pass || ''), u.salt)) return json(403, { error: '密码不对' });
     if (!u.token) u.token = tok();
+    u.tokens = Array.isArray(u.tokens) ? u.tokens : (u.token ? [u.token] : []);
+    if (u.tokens.indexOf(u.token) < 0) u.tokens.push(u.token);
+    if (u.tokens.length > 6) u.tokens = u.tokens.slice(-6);
     u.lastSync = Date.now();
     await writeDB(store, db);
     return json(200, { ok: true, id: name, token: u.token, hasData: !!u.data });
   }
   if (path.endsWith('/sync')) {
     const db = await readDB(store);
-    const name = Object.keys(db.users).find(k => db.users[k].token === body.token);
+    const name = Object.keys(db.users).find(k => db.users[k].token === body.token || (db.users[k].tokens || []).indexOf(body.token) >= 0);
     if (!name) return json(401, { error: '登录已失效，重新登录' });
     db.users[name].data = body.data; db.users[name].lastSync = Date.now();
     await writeDB(store, db);
@@ -307,7 +310,7 @@ document.getElementById('relGo').onclick=function(){
   }
   if (path.endsWith('/load')) {
     const db = await readDB(store);
-    const name = Object.keys(db.users).find(k => db.users[k].token === qs.token);
+    const name = Object.keys(db.users).find(k => db.users[k].token === qs.token || (db.users[k].tokens || []).indexOf(qs.token) >= 0);
     if (!name) return json(401, { error: '登录已失效' });
     db.users[name].lastSync = Date.now();
     await writeDB(store, db);
@@ -319,7 +322,7 @@ document.getElementById('relGo').onclick=function(){
     if (!tk) return null;
     for (let i = 0; i < 3; i++) {
       const db = await readDB(store);
-      const n = Object.keys(db.users || {}).find(k => db.users[k].token === tk);
+      const n = Object.keys(db.users || {}).find(k => db.users[k].token === tk || (db.users[k].tokens || []).indexOf(tk) >= 0);
       if (n) return n;
       await new Promise(r => setTimeout(r, 400));
     }
