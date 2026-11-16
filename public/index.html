@@ -1327,8 +1327,9 @@ function clubErr(txt){
   var e={}; try{ e=JSON.parse(txt); }catch(x){}
   var m=e.error||'操作失败';
   if(/登录/.test(m)){
-    document.getElementById('clBody').innerHTML='<div class="dim">登录已过期。<br>去「我的」点「退出」，再用同一个 ID 登录一次就能用圈子。</div>';
-    toast('登录已过期，重新登录');
+    document.getElementById('clBody').innerHTML='<div class="dim">登录已过期，请重新登录。</div>';
+    toast('登录已过期，请重新登录');
+    try{ S.acc=null; save(); showAuth(); document.getElementById('auMsg').textContent='登录已过期，请重新登录'; }catch(e){}
     return true;
   }
   toast(m); return false;
