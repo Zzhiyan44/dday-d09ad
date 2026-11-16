@@ -364,29 +364,40 @@ document.getElementById('relGo').onclick=function(){
   }
 
   if (path.endsWith('/room')) {
-    let room = { msgs: [], online: {} };
-    try { room = (await store.get(KEY_ROOM, { type: 'json' })) || room; } catch (e) {}
+    const loadMsgs = async (n) => {
+      const ls = await store.list({ prefix: 'room/' });
+      const keys = (ls.blobs || []).map(b => b.key).sort().slice(-n);
+      const out = [];
+      for (const k of keys) {
+        try { const v = await store.get(k, { type: 'json' }); if (v) out.push(v); } catch (e) {}
+      }
+      return out;
+    };
+    let onlineRaw = {};
+    try { onlineRaw = (await store.get('room-online.json', { type: 'json' })) || {}; } catch (e) {}
     if (event.httpMethod === 'POST') {
       const name = await who();
       if (!name) return json(401, { error: '先登录' });
       const now = Date.now();
-      room.online = room.online || {};
-      room.online[name] = { at: now, focus: String(body.focus || '').slice(0, 20) };
+      onlineRaw[name] = { at: now, focus: String(body.focus || '').slice(0, 20) };
+      await store.setJSON('room-online.json', onlineRaw);
       const text = String(body.msg || '').trim().slice(0, 200);
+      let posted = null;
       if (text) {
-        room.msgs = arr(room.msgs, 120);
-        const mine = room.msgs.filter(x => x.id === name).pop();
-        if (mine && now - mine.at < 3000) return json(429, { error: '慢点' });
-        room.msgs.push({ id: name, t: text, at: now });
-        room.msgs = arr(room.msgs, 120);
+        const key = 'room/' + String(now).padStart(16, '0') + '-' + Math.random().toString(36).slice(2, 6);
+        posted = { id: name, t: text, at: now };
+        await store.setJSON(key, posted);
       }
-      await store.setJSON(KEY_ROOM, room);
+      const msgs = await loadMsgs(60);
+      const online = Object.keys(onlineRaw).filter(k => now - (onlineRaw[k].at || 0) < 180000)
+        .map(k => ({ n: k, focus: onlineRaw[k].focus || '' }));
+      return json(200, { online, msgs, posted }, { 'Cache-Control': 'no-store' });
     }
     const now = Date.now();
-    const online = Object.keys(room.online || {})
-      .filter(k => now - (room.online[k].at || 0) < 180000)
-      .map(k => ({ n: k, focus: room.online[k].focus || '' }));
-    return json(200, { online, msgs: arr(room.msgs, 60) }, { 'Cache-Control': 'no-store' });
+    const online = Object.keys(onlineRaw).filter(k => now - (onlineRaw[k].at || 0) < 180000)
+      .map(k => ({ n: k, focus: onlineRaw[k].focus || '' }));
+    const msgs = await loadMsgs(60);
+    return json(200, { online, msgs }, { 'Cache-Control': 'no-store' });
   }
 
   if (path.endsWith('/rank')) {
