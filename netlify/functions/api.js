@@ -4,6 +4,15 @@ let getStore, connectLambda;
 try { const b = require('@netlify/blobs'); getStore = b.getStore; connectLambda = b.connectLambda; } catch (e) { getStore = null; }
 
 const ADMIN_PASS = process.env.ADMIN_PASS || 'zhiyan2026';
+function loginPage(err) {
+  return `<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<style>body{font-family:system-ui;background:#0e1116;color:#e8edf4;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.b{width:280px}input,button{width:100%;height:42px;margin-top:10px;border-radius:10px;border:1px solid #263140;background:#151c25;color:#e8edf4;font-size:14px;padding:0 12px}
+button{background:#35d39a;color:#08110d;border:0;font-weight:600}.e{color:#ff7a7a;font-size:12px;margin-top:8px}</style>
+<div class=b><h3 style="font-size:15px;margin:0 0 4px">后台登录</h3><div style="color:#8b94a6;font-size:12px">仅作者可用</div>
+<form method=post action="/admin/login"><input type=password name=pass placeholder=管理密码 autofocus><button>进入</button></form>
+<div class=e>${err || ''}</div></div>`;
+}
 const KEY_USERS = 'users.json';
 
 function h(pass, salt) { return crypto.createHash('sha256').update(salt + ':' + pass).digest('hex'); }
@@ -38,7 +47,16 @@ exports.handler = async (event) => {
   const qs = event.queryStringParameters || {};
   const path = (event.path || '').replace(/\/+$/, '');
   let body = {};
-  try { body = JSON.parse(event.body || '{}'); } catch (e) { body = {}; }
+  const raw = event.body || '';
+  const ct = String(event.headers['content-type'] || event.headers['Content-Type'] || '');
+  try {
+    if (ct.indexOf('application/x-www-form-urlencoded') >= 0) {
+      const qsObj = new URLSearchParams(raw);
+      qsObj.forEach((v, k) => { body[k] = v; });
+    } else {
+      body = JSON.parse(raw || '{}');
+    }
+  } catch (e) { body = {}; }
 
   const isAdminRoute = path.endsWith('/admin') || path.endsWith('/admin/login') || path.endsWith('/admin/logout') || qs.admin;
 
@@ -47,8 +65,13 @@ exports.handler = async (event) => {
     const cookie = (event.headers.cookie || event.headers.Cookie || '');
     const authed = cookie.indexOf('zd=' + adminSig()) >= 0;
     if (path.endsWith('/admin/login')) {
-      if (String(body.pass || '') !== ADMIN_PASS) return json(403, { error: '密码不对' });
-      return json(200, { ok: true }, { 'Set-Cookie': 'zd=' + adminSig() + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400' });
+      if (String(body.pass || '') !== ADMIN_PASS) {
+        return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          body: loginPage('密码不对，再试一次') };
+      }
+      return { statusCode: 302, headers: {
+          'Set-Cookie': 'zd=' + adminSig() + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400',
+          'Location': '/admin' }, body: '' };
     }
     if (path.endsWith('/admin/logout')) return { statusCode: 302, headers: { 'Set-Cookie': 'zd=; Path=/; Max-Age=0', Location: '/admin' }, body: '' };
     if (!authed) {
