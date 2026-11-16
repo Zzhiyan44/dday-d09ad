@@ -136,6 +136,20 @@ nav a b{display:block;font-size:18px;line-height:1.25;font-weight:400}
 #dn.on{display:flex}
 #ntc{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:86;padding:18px}
 #ntc.on{display:flex}
+#wallBox{position:relative;width:100%;height:min(48vh,380px);border-radius:14px;background:
+  radial-gradient(circle at 20% 15%,rgba(53,211,154,.10),transparent 45%),
+  radial-gradient(circle at 85% 80%,rgba(90,160,255,.10),transparent 45%),
+  var(--bg2);
+  border:1px solid var(--line);overflow:hidden;touch-action:manipulation}
+.stk{position:absolute;transform-origin:center;max-width:150px;padding:7px 9px;border-radius:8px;
+  box-shadow:0 3px 8px rgba(0,0,0,.28);cursor:pointer;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;word-break:break-word;line-height:1.35}
+.stk .who{font-size:9.5px;opacity:.65;margin-bottom:2px}
+.stk.draft{opacity:.75;border:1.5px dashed #35d39a}
+.dm{position:absolute;left:100%;white-space:nowrap;font-size:12.5px;color:#eaf6ff;
+  text-shadow:0 1px 3px rgba(0,0,0,.75);will-change:transform;animation-name:dmGo;animation-timing-function:linear;animation-fill-mode:forwards}
+@keyframes dmGo{from{transform:translateX(0)}to{transform:translateX(calc(-100% - 100vw))}}
+#dmBox{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 #ntc .mbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;width:100%}
 #auth{position:fixed;inset:0;background:#0b0f14;display:none;align-items:center;justify-content:center;z-index:120;padding:20px;overflow:auto}
 #auth.on{display:flex}
@@ -1320,34 +1334,106 @@ function ago(ts){
   if(d<86400000) return Math.floor(d/3600000)+' 小时前';
   return Math.floor(d/86400000)+' 天前';
 }
+var WALL_COLORS=[
+ 'background:#2b3a30;color:#d9f5e3',
+ 'background:#2e3542;color:#dbe7ff',
+ 'background:#3a2f36;color:#ffdfeb',
+ 'background:#3a372a;color:#fff3cf',
+ 'background:#2c3a3f;color:#d7f2f7',
+ 'background:#352f42;color:#e8dcff'];
+var wallPos={x:50,y:50}, wallSize=1, wallRot=0, wallDM=false, dmTimer=null;
 function drawWall(){
-  document.getElementById('clBody').innerHTML='<div class="dim" style="font-size:12px">正在加载…</div>';
+  var b=document.getElementById('clBody');
+  b.innerHTML='<div class="dim" style="font-size:12px">正在加载…</div>';
   getJSON('/api/wall?t='+Date.now(), function(ok,text){
-    if(!ok){ document.getElementById('clBody').innerHTML='<div class="dim">连不上服务器</div>'; return; }
+    if(!ok){ b.innerHTML='<div class="dim">连不上服务器</div>'; return; }
     var j={}; try{ j=JSON.parse(text); }catch(e){}
-    clWallList=j.list||[];
-    var rows=clWallList.map(function(x){
-      var mine = S.acc && x.id===S.acc.id;
-      return '<div style="padding:10px 0;border-bottom:1px solid var(--line)">'+
-        '<div class="row" style="justify-content:space-between"><b style="font-size:12.5px;color:'+(mine?'var(--acc)':'var(--txt)')+'">'+esc2(x.id)+(mine?'（我）':'')+'</b>'+
-        '<span class="dim" style="font-size:11px">'+ago(x.at)+'</span></div>'+
-        '<div style="font-size:13.5px;margin-top:5px;line-height:1.6;word-break:break-word">'+esc2(x.t)+'</div></div>';
-    }).join('')||'<div class="dim">还没有人留言，写第一条。</div>';
-    document.getElementById('clBody').innerHTML=rows+
-      '<div style="margin-top:12px"><textarea id="wallIn" placeholder="说点什么…（200 字内）" style="width:100%;height:70px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);padding:10px 12px;font-size:13px"></textarea>'+
-      '<div class="row" style="gap:8px;margin-top:8px"><button class="pri" style="flex:1;height:40px" id="wallSend">发布</button>'+
-      '<button style="height:40px" id="wallRe">刷新</button></div>'+
-      '<div class="dim" style="font-size:11px;margin-top:8px">20 秒内只能发一条</div></div>';
+    clWallList=(j.list||[]).slice(0,60);
+    var sticks=clWallList.map(function(x,i){
+      var r=+x.r||0, s=+x.s||1, c=+x.c||0;
+      var css=WALL_COLORS[c%WALL_COLORS.length];
+      return '<div class="stk" data-i="'+i+'" style="left:'+(+x.x||50)+'%;top:'+(+x.y||50)+'%;'+
+        'transform:translate(-50%,-50%) rotate('+r+'deg) scale('+s.toFixed(2)+');'+css+'">'+
+        '<div class="who">'+esc2(x.id)+'</div>'+esc2(x.t)+'</div>';
+    }).join('');
+    b.innerHTML=
+      '<div class="row" style="justify-content:space-between;margin-bottom:8px">'+
+        '<span class="dim" style="font-size:11.5px">共 '+clWallList.length+' 张 · 点墙上空白处选位置</span>'+
+        '<button class="mini" id="dmToggle" style="'+(wallDM?'border-color:var(--acc);color:var(--acc)':'')+'">'+(wallDM?'弹幕 开':'弹幕 关')+'</button>'+
+      '</div>'+
+      '<div id="wallBox">'+sticks+'<div id="dmBox"></div></div>'+
+      '<div style="margin-top:12px">'+
+        '<textarea id="wallIn" placeholder="贴一张…（60 字内更好看）" maxlength="120" style="width:100%;height:62px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);padding:10px 12px;font-size:13px"></textarea>'+
+        '<div class="kv" style="margin-top:8px"><span>大小</span><b id="szV">'+wallSize.toFixed(2)+'</b></div>'+
+        '<input type="range" id="wallSz" min="0.8" max="1.2" step="0.05" value="'+wallSize+'" style="width:100%">'+
+        '<div class="kv"><span>方向</span><b id="rtV">'+wallRot+'°</b></div>'+
+        '<input type="range" id="wallRt" min="-20" max="20" step="1" value="'+wallRot+'" style="width:100%">'+
+        '<div class="row" style="gap:8px;margin-top:8px"><button class="pri" style="flex:1;height:40px" id="wallSend">贴上去</button>'+
+        '<button style="height:40px" id="wallRe">刷新</button></div>'+
+        '<div class="dim" style="font-size:11px;margin-top:8px">20 秒一条；位置就是你点的地方</div>'+
+      '</div>';
+
+    var box=document.getElementById('wallBox');
+    box.onclick=function(ev){
+      var t=ev.target;
+      if(t && t.className && String(t.className).indexOf('stk')>=0) return;
+      var r=box.getBoundingClientRect();
+      wallPos.x=Math.max(4,Math.min(96,((ev.clientX-r.left)/r.width*100)));
+      wallPos.y=Math.max(5,Math.min(95,((ev.clientY-r.top)/r.height*100)));
+      var d=box.querySelector('.stk.draft'); if(d) d.remove();
+      var dv=document.createElement('div');
+      dv.className='stk draft';
+      dv.style.cssText='left:'+wallPos.x+'%;top:'+wallPos.y+'%;transform:translate(-50%,-50%) rotate('+wallRot+'deg) scale('+wallSize+');'+WALL_COLORS[0];
+      dv.innerHTML='<div class="who">预览</div>贴这里';
+      box.appendChild(dv);
+    };
+    [].forEach.call(box.querySelectorAll('.stk:not(.draft)'), function(el){
+      el.onclick=function(ev){
+        ev.stopPropagation();
+        var i=+el.getAttribute('data-i'), x=clWallList[i];
+        if(x) toast(x.id+'：'+x.t);
+      };
+    });
+    document.getElementById('wallSz').oninput=function(){
+      wallSize=+this.value; document.getElementById('szV').textContent=wallSize.toFixed(2);
+      var d=box.querySelector('.stk.draft'); if(d) d.style.transform='translate(-50%,-50%) rotate('+wallRot+'deg) scale('+wallSize+')';
+    };
+    document.getElementById('wallRt').oninput=function(){
+      wallRot=+this.value; document.getElementById('rtV').textContent=wallRot+'°';
+      var d=box.querySelector('.stk.draft'); if(d) d.style.transform='translate(-50%,-50%) rotate('+wallRot+'deg) scale('+wallSize+')';
+    };
+    document.getElementById('dmToggle').onclick=function(){ wallDM=!wallDM; drawWall(); };
+    document.getElementById('wallRe').onclick=drawWall;
     document.getElementById('wallSend').onclick=function(){
       var t=document.getElementById('wallIn').value.trim();
       if(!t){ toast('写点什么'); return; }
-      postJSON('/api/wall',{token:S.acc.token, text:t}, function(ok2,txt){
-        if(ok2){ toast('已发布'); drawWall(); }
+      postJSON('/api/wall',{token:S.acc.token, text:t, x:wallPos.x, y:wallPos.y, r:wallRot, s:wallSize, c:Math.floor(Math.random()*6)}, function(ok2,txt){
+        if(ok2){ toast('已贴上'); drawWall(); }
         else{ var e={}; try{ e=JSON.parse(txt); }catch(x){} toast(e.error||'发送失败'); }
       });
     };
-    document.getElementById('wallRe').onclick=drawWall;
+    if(wallDM) startDanmu();
   });
+}
+function startDanmu(){
+  var box=document.getElementById('dmBox');
+  if(!box) return;
+  if(dmTimer) clearInterval(dmTimer);
+  var pool=clWallList.slice(0,40);
+  var push=function(){
+    var bx=document.getElementById('dmBox'); if(!bx) return;
+    if(!pool.length) return;
+    var m=pool[Math.floor(Math.random()*pool.length)];
+    var el=document.createElement('div');
+    el.className='dm';
+    el.style.top=(6+Math.random()*82)+'%';
+    el.textContent=m.id+'：'+m.t;
+    el.style.animationDuration=(9+Math.random()*7).toFixed(1)+'s';
+    bx.appendChild(el);
+    setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 17000);
+  };
+  for(var i=0;i<3;i++) setTimeout(push, i*400);
+  dmTimer=setInterval(push, 1800);
 }
 function drawRoom(){
   var b=document.getElementById('clBody');
